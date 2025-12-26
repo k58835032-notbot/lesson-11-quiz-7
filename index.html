@@ -48,31 +48,33 @@ button {
   font-weight:bold;
   white-space:pre-line;
 }
-#gif {margin-top:20px;max-width:250px;border-radius:12px;}
 #retry {
   display:none;
   background:#b23b3b;
   color:white;
   border:2px solid #b23b3b;
-  margin:20px auto 0;
 }
 #retry:hover {background:#ff4da6;}
 </style>
 </head>
 
 <body>
+
 <h1>🎧 Hiragana → Romaji Word Quiz</h1>
 
 <button id="playSound">▶️ Play Sound</button>
 <div id="choices"></div>
 <div id="result"></div>
-<img id="gif" src="" alt="" />
 <button id="retry">🔄 Retry Quiz</button>
 
 <script>
+/* ================= AUDIO BASE PATH ================= */
+const AUDIO_BASE =
+"https://raw.githubusercontent.com/k58835032-notbot/lesson-11-quiz-7/main/audio/";
+
 /* ================= WORD LIST ================= */
 const words = [
-  {jp:"とら", romaji:"tora", meaning:"lion"},
+{jp:"とら", romaji:"tora", meaning:"lion"},
   {jp:"らっぱ", romaji:"rappa", meaning:"trumpet"},
   {jp:"らく", romaji:"raku", meaning:"easy"},
   {jp:"らくがき", romaji:"rakugaki", meaning:"doodle"},
@@ -121,44 +123,22 @@ const words = [
   {jp:"なおる", romaji:"naoru", meaning:"to fix, to get better"}
 ];
 
-/* ================= DISTRACTOR ENGINE ================= */
-const yoonMap = {
-  "きゃ":"きや","きゅ":"きゆ","きょ":"きよ",
-  "しゃ":"しや","しゅ":"しゆ","しょ":"しよ",
-  "ちゃ":"ちや","ちゅ":"ちゆ","ちょ":"ちよ",
-  "りゃ":"りや","りゅ":"りゆ","りょ":"りよ"
-};
+/* ================= DISTRACTORS ================= */
+const kanaPool = ["あ","い","う","え","お","ら","り","る","れ","ろ","つ","っ"];
 
-const dakutenMap = {
-  "か":"が","が":"か","さ":"ざ","ざ":"さ","た":"だ","だ":"た",
-  "は":"ば","ば":"は","ぱ":"は","つ":"づ","づ":"つ","し":"じ","じ":"し"
-};
+function randomKana(){
+  return kanaPool[Math.floor(Math.random()*kanaPool.length)];
+}
 
-function generateDistractors(correctJP){
+function generateDistractors(correct){
   const set = new Set();
-
-  // yōon confusion
-  for(const y in yoonMap){
-    if(correctJP.includes(y)) set.add(correctJP.replace(y, yoonMap[y]));
-  }
-
-  // dakuten confusion
-  for(const k in dakutenMap){
-    if(correctJP.includes(k)) set.add(correctJP.replace(k, dakutenMap[k]));
-  }
-
-  // small っ insertion
-  if(correctJP.includes("つ")) set.add(correctJP.replace("つ","っつ"));
-
-  // vowel shortening
-  set.add(correctJP.replace("う",""));
-
-  // fallback random kana noise
   while(set.size < 3){
-    set.add(correctJP.slice(0,-1)+"あ");
+    let v = correct;
+    const i = Math.floor(Math.random()*v.length);
+    v = v.slice(0,i) + randomKana() + v.slice(i+1);
+    if(v !== correct) set.add(v);
   }
-
-  return [...set].slice(0,3);
+  return [...set];
 }
 
 /* ================= QUIZ LOGIC ================= */
@@ -169,9 +149,17 @@ const maxQuestions = 25;
 
 const choicesDiv = document.getElementById("choices");
 const resultEl = document.getElementById("result");
-const gifEl = document.getElementById("gif");
-const playSoundBtn = document.getElementById("playSound");
 const retryBtn = document.getElementById("retry");
+const playSoundBtn = document.getElementById("playSound");
+
+let audio = new Audio();
+
+function playCurrentSound(){
+  if(!currentWord) return;
+  audio.src = AUDIO_BASE + currentWord.romaji + ".mp3";
+  audio.currentTime = 0;
+  audio.play().catch(()=>alert("Audio file not found"));
+}
 
 function newQuestion(){
   if(count >= maxQuestions) return endQuiz();
@@ -180,8 +168,8 @@ function newQuestion(){
   currentWord = words[Math.floor(Math.random()*words.length)];
   choicesDiv.innerHTML = "";
 
-  const distractors = generateDistractors(currentWord.jp);
-  const options = [...distractors, currentWord.jp].sort(()=>Math.random()-0.5);
+  const options = [...generateDistractors(currentWord.jp), currentWord.jp]
+    .sort(()=>Math.random()-0.5);
 
   options.forEach(opt=>{
     const btn = document.createElement("button");
@@ -191,8 +179,7 @@ function newQuestion(){
     choicesDiv.appendChild(btn);
   });
 
-  resultEl.textContent =
-    `Q ${count} / ${maxQuestions}\nChoose the correct hiragana`;
+  resultEl.textContent = `Q ${count} / ${maxQuestions}`;
 }
 
 function checkAnswer(ans){
@@ -206,48 +193,29 @@ Meaning: ${currentWord.meaning}`;
     resultEl.textContent =
 `❌ Wrong!
 Correct: ${currentWord.jp}
-Romaji: ${currentWord.romaji}
+${currentWord.romaji}
 Meaning: ${currentWord.meaning}`;
   }
-  setTimeout(newQuestion, 1600);
+  setTimeout(newQuestion, 1500);
 }
 
 function endQuiz(){
   choicesDiv.innerHTML="";
-  let gif="", text="";
-  if(score>=21){
-    text="🌟 Excellent!";
-    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/cool%20cute%20cat.gif";
-  } else if(score>=12){
-    text="👍 Good job!";
-    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/cute%20cat%20walking.gif";
-  } else {
-    text="🌱 Keep practicing!";
-    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/sad%20cute%20cat.gif";
-  }
-
-  resultEl.textContent = `${text}\nScore: ${score} / ${maxQuestions}`;
-  gifEl.src = gif;
-  playSoundBtn.disabled = true;
+  resultEl.textContent = `🎉 Finished!\nScore: ${score} / ${maxQuestions}`;
   retryBtn.style.display="block";
 }
 
 function resetQuiz(){
   score=0;
   count=0;
-  gifEl.src="";
   retryBtn.style.display="none";
-  playSoundBtn.disabled=false;
   newQuestion();
 }
 
-/* audio placeholder */
-function playCurrentSound(){}
-
 playSoundBtn.onclick = playCurrentSound;
 retryBtn.onclick = resetQuiz;
-
 newQuestion();
 </script>
 </body>
 </html>
+
