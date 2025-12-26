@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Hiragana → Romaji Word Quiz</title>
+
+<style>
+body {
+  font-family:"Hiragino Kaku Gothic Pro","Meiryo",sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:40px;
+  color:#333;
+  text-align:center;
+}
+h1 {color:#b23b3b;font-size:2em;margin-bottom:20px;}
+button {
+  font-size:18px;
+  padding:12px 24px;
+  margin:10px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.3s;
+}
+#playSound {
+  background:white;
+  color:#b23b3b;
+  border:3px solid #b23b3b;
+}
+#playSound:hover {background:#ffe6f2;}
+.choice {
+  background:#b23b3b;
+  color:white;
+  border:2px solid #b23b3b;
+}
+.choice:hover {background:#ff4da6;}
+#choices {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  max-width:720px;
+}
+#result {
+  font-size:20px;
+  margin-top:20px;
+  font-weight:bold;
+  white-space:pre-line;
+}
+#gif {margin-top:20px;max-width:250px;border-radius:12px;}
+#retry {
+  display:none;
+  background:#b23b3b;
+  color:white;
+  border:2px solid #b23b3b;
+  margin:20px auto 0;
+}
+#retry:hover {background:#ff4da6;}
+</style>
+</head>
+
+<body>
+<h1>🎧 Hiragana → Romaji Word Quiz</h1>
+
+<button id="playSound">▶️ Play Sound</button>
+<div id="choices"></div>
+<div id="result"></div>
+<img id="gif" src="" alt="" />
+<button id="retry">🔄 Retry Quiz</button>
+
+<script>
+/* ================= WORD LIST ================= */
+const words = [
+  {jp:"とら", romaji:"tora", meaning:"lion"},
+  {jp:"らっぱ", romaji:"rappa", meaning:"trumpet"},
+  {jp:"らく", romaji:"raku", meaning:"easy"},
+  {jp:"らくがき", romaji:"rakugaki", meaning:"doodle"},
+  {jp:"らいねん", romaji:"rainen", meaning:"next year"},
+  {jp:"らいと", romaji:"raito", meaning:"light"},
+  {jp:"りんご", romaji:"ringo", meaning:"apple"},
+  {jp:"りす", romaji:"risu", meaning:"squirrel"},
+  {jp:"りゆう", romaji:"riyuu", meaning:"reason"},
+  {jp:"りょこう", romaji:"ryokou", meaning:"travel"},
+  {jp:"りかい", romaji:"rikai", meaning:"understanding"},
+  {jp:"りょう", romaji:"ryou", meaning:"dormitory / quantity"},
+  {jp:"みりょく", romaji:"miryoku", meaning:"appeal"},
+  {jp:"るす", romaji:"rusu", meaning:"absence"},
+  {jp:"しゅるい", romaji:"shurui", meaning:"kind / type"},
+  {jp:"るすばん", romaji:"rusuban", meaning:"house-sitting"},
+  {jp:"るろう", romaji:"rurou", meaning:"wandering"},
+  {jp:"れい", romaji:"rei", meaning:"example / zero"},
+  {jp:"れもん", romaji:"remon", meaning:"lemon"},
+  {jp:"れきし", romaji:"rekishi", meaning:"history"},
+  {jp:"れいぞうこ", romaji:"reizoko", meaning:"refrigerator"},
+  {jp:"れんしゅう", romaji:"renshuu", meaning:"practice"},
+  {jp:"ぎょうれつ", romaji:"gyouretsu", meaning:"row / line"},
+  {jp:"ろく", romaji:"roku", meaning:"six"},
+  {jp:"ろば", romaji:"roba", meaning:"donkey"},
+  {jp:"ろうそく", romaji:"rousoku", meaning:"candle"},
+  {jp:"ろうか", romaji:"rouka", meaning:"corridor"},
+  {jp:"ろくおん", romaji:"rokuon", meaning:"recording"},
+  {jp:"ろじ", romaji:"roji", meaning:"alley"},
+  {jp:"さくら", romaji:"sakura", meaning:"cherry blossom"},
+  {jp:"そら", romaji:"sora", meaning:"sky"},
+  {jp:"くらい", romaji:"kurai", meaning:"dark"},
+  {jp:"あかるい", romaji:"akarui", meaning:"bright"},
+  {jp:"あらし", romaji:"arashi", meaning:"storm"},
+  {jp:"からて", romaji:"karate", meaning:"karate"},
+  {jp:"むら", romaji:"mura", meaning:"village"},
+  {jp:"てら", romaji:"tera", meaning:"temple"},
+  {jp:"はら", romaji:"hara", meaning:"belly / field"},
+  {jp:"かれ", romaji:"kare", meaning:"him"},
+  {jp:"くつろげる", romaji:"kutsurogeru", meaning:"to relax"},
+  {jp:"ろんり", romaji:"ronri", meaning:"theory"},
+  {jp:"さる", romaji:"saru", meaning:"monkey"},
+  {jp:"まつり", romaji:"matsuri", meaning:"festival"},
+  {jp:"りもこん", romaji:"rimokon", meaning:"remote control"},
+  {jp:"さら", romaji:"sara", meaning:"plate"},
+  {jp:"ひらがな", romaji:"hiragana", meaning:"hiragana"},
+  {jp:"なおる", romaji:"naoru", meaning:"to fix, to get better"}
+];
+
+/* ================= DISTRACTOR ENGINE ================= */
+const yoonMap = {
+  "きゃ":"きや","きゅ":"きゆ","きょ":"きよ",
+  "しゃ":"しや","しゅ":"しゆ","しょ":"しよ",
+  "ちゃ":"ちや","ちゅ":"ちゆ","ちょ":"ちよ",
+  "りゃ":"りや","りゅ":"りゆ","りょ":"りよ"
+};
+
+const dakutenMap = {
+  "か":"が","が":"か","さ":"ざ","ざ":"さ","た":"だ","だ":"た",
+  "は":"ば","ば":"は","ぱ":"は","つ":"づ","づ":"つ","し":"じ","じ":"し"
+};
+
+function generateDistractors(correctJP){
+  const set = new Set();
+
+  // yōon confusion
+  for(const y in yoonMap){
+    if(correctJP.includes(y)) set.add(correctJP.replace(y, yoonMap[y]));
+  }
+
+  // dakuten confusion
+  for(const k in dakutenMap){
+    if(correctJP.includes(k)) set.add(correctJP.replace(k, dakutenMap[k]));
+  }
+
+  // small っ insertion
+  if(correctJP.includes("つ")) set.add(correctJP.replace("つ","っつ"));
+
+  // vowel shortening
+  set.add(correctJP.replace("う",""));
+
+  // fallback random kana noise
+  while(set.size < 3){
+    set.add(correctJP.slice(0,-1)+"あ");
+  }
+
+  return [...set].slice(0,3);
+}
+
+/* ================= QUIZ LOGIC ================= */
+let currentWord;
+let score = 0;
+let count = 0;
+const maxQuestions = 25;
+
+const choicesDiv = document.getElementById("choices");
+const resultEl = document.getElementById("result");
+const gifEl = document.getElementById("gif");
+const playSoundBtn = document.getElementById("playSound");
+const retryBtn = document.getElementById("retry");
+
+function newQuestion(){
+  if(count >= maxQuestions) return endQuiz();
+  count++;
+
+  currentWord = words[Math.floor(Math.random()*words.length)];
+  choicesDiv.innerHTML = "";
+
+  const distractors = generateDistractors(currentWord.jp);
+  const options = [...distractors, currentWord.jp].sort(()=>Math.random()-0.5);
+
+  options.forEach(opt=>{
+    const btn = document.createElement("button");
+    btn.className="choice";
+    btn.textContent=opt;
+    btn.onclick=()=>checkAnswer(opt);
+    choicesDiv.appendChild(btn);
+  });
+
+  resultEl.textContent =
+    `Q ${count} / ${maxQuestions}\nChoose the correct hiragana`;
+}
+
+function checkAnswer(ans){
+  if(ans === currentWord.jp){
+    score++;
+    resultEl.textContent =
+`⭕ Correct!
+${currentWord.jp} — ${currentWord.romaji}
+Meaning: ${currentWord.meaning}`;
+  } else {
+    resultEl.textContent =
+`❌ Wrong!
+Correct: ${currentWord.jp}
+Romaji: ${currentWord.romaji}
+Meaning: ${currentWord.meaning}`;
+  }
+  setTimeout(newQuestion, 1600);
+}
+
+function endQuiz(){
+  choicesDiv.innerHTML="";
+  let gif="", text="";
+  if(score>=21){
+    text="🌟 Excellent!";
+    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/cool%20cute%20cat.gif";
+  } else if(score>=12){
+    text="👍 Good job!";
+    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/cute%20cat%20walking.gif";
+  } else {
+    text="🌱 Keep practicing!";
+    gif="https://raw.githubusercontent.com/k58835032-notbot/lesson-9-morae/main/sad%20cute%20cat.gif";
+  }
+
+  resultEl.textContent = `${text}\nScore: ${score} / ${maxQuestions}`;
+  gifEl.src = gif;
+  playSoundBtn.disabled = true;
+  retryBtn.style.display="block";
+}
+
+function resetQuiz(){
+  score=0;
+  count=0;
+  gifEl.src="";
+  retryBtn.style.display="none";
+  playSoundBtn.disabled=false;
+  newQuestion();
+}
+
+/* audio placeholder */
+function playCurrentSound(){}
+
+playSoundBtn.onclick = playCurrentSound;
+retryBtn.onclick = resetQuiz;
+
+newQuestion();
+</script>
+</body>
+</html>
